@@ -3,12 +3,25 @@
 # holidays: to check if a days is holiday
 import polars as pl
 import holidays
+
+# Import the required packages
+# torch: for creating training and testing datasets and prediction model
+# sklearn: for splitting traingin and testing data from original and prediction modelling
+import torch as T
+from torch.utils.data import TensorDataset, DataLoader
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler, StandardScaler, MaxAbsScaler, RobustScaler
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
+###################### Part-1  ###################### 
+#####################################################  
+
 # Getting the station between Oslo to Trondhiem Line
 station_cleaned_sorted = [ 'Oslo S', 'Lillestrøm', 'Gardermoen', 'Hamar', 'Brumunddal',   'Moelv',  'Lillehammer','Ringebu', 'Vinstra',  'Kvam', 'Otta',  'Dovre', 'Dombås', 'Hjerkinn',  'Kongsvoll',  'Oppdal', 'Berkåk','Støren',  'Heimdal',  'Trondheim']
 # Creating the dictionary for station numbers between Oslo to Trondhiem Line
 station_dict = {station_cleaned_sorted[i]: i for i in range(len(station_cleaned_sorted))}
 # Reading the arrival and departure data acquired from BaneNOR
-df = pl.read_csv('trains.csv', separator ='\t')
+df = pl.read_csv('Train_data/trains.csv', separator ='\t')
 # remove all rows where the stations are not in the scope of list "station_cleaned_sorted"
 df = df.filter(pl.col("Station").is_in(station_cleaned_sorted))
 # filter the data by removing the null values from column "value"
@@ -61,3 +74,51 @@ unique_dates_trains = df.groupby("Train_num", maintain_order=True)
 df = unique_dates_trains.apply(lambda x: generate_time_lags_zero(x,5))
 # Create a new dataframe with selected columns
 test_df = df[['Datetime', 'Train_num','Station_num','day','value', 'delay_grad', 'Direction_0', 'Direction_1','lag1', 'lag2', 'lag3', 'lag4', 'lag5']]
+
+###################### Part-2  ###################### 
+#####################################################  
+# A function to split data into training, testing and validation dataset. Training and validation data ratio are equal.
+def train_val_test_split(df, target_col, test_ratio):
+    # Seperate the features that will be used to predict (X) the value (y) 
+    X, y = df.drop(columns=[target_col]), df[[target_col]]
+    # Split the training (X_train, y_train) and testing (X_test, y_test) datasets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_ratio, shuffle=False)
+    # Split the training (X_train, y_train) data into validation (X_val, y_val) and training (X_train, y_train) datasets
+    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=test_ratio, shuffle=False)
+    #v Return the training, testing and validation datasets 
+    return X_train, X_val, X_test, y_train, y_val, y_test
+
+# Use the function "train_val_test_split" to split dataset "test_df"
+X_train, X_val, X_test, y_train, y_val, y_test = train_val_test_split(test_df, 'value', 0.15)
+
+# Use a scaler type to convert the data to numpy equivalent arrays (easy for calculation and scaling)
+scaler = MinMaxScaler() # MinMaxScaler(), StandardScaler(), MaxAbsScaler(), RobustScaler()
+
+# Transform the training, testing and validation dataset to arrays using the scaler (X)
+X_train_arr, X_val_arr, X_test_arr = scaler.fit_transform(X_train), scaler.transform(X_val), scaler.transform(X_test)
+# Transform the training, testing and validation dataset to arrays using the scaler (y)
+y_train_arr, y_val_arr, y_test_arr = scaler.fit_transform(y_train), scaler.transform(y_val), scaler.transform(y_test)
+
+# Convert the array to tensor (training data)
+train_features, train_targets = T.Tensor(X_train_arr), T.Tensor(y_train_arr)
+# Convert the array to tensor (validation data)
+val_features, val_targets = T.Tensor(X_val_arr), T.Tensor(y_val_arr)
+# Convert the array to tensor (testing data)
+test_features, test_targets = T.Tensor(X_test_arr), T.Tensor(y_test_arr)
+
+# Pool the tensors into tensor datasets (training data)
+train = TensorDataset(train_features, train_targets)
+# Pool the tensors into tensor datasets (validation data)
+val = TensorDataset(val_features, val_targets)
+# Pool the tensors into tensor datasets (testing data)
+test = TensorDataset(test_features, test_targets)
+
+# Assign batch size for modelling
+batch_size = 64
+# Create a DataLoader class for prediction modelling (training data)
+train_loader = DataLoader(train, batch_size=batch_size, shuffle=False, drop_last=True)
+# Create a DataLoader class for prediction modelling (validation data)
+val_loader = DataLoader(val, batch_size=batch_size, shuffle=False, drop_last=True)
+# Create a DataLoader class for prediction modelling (testing data)
+test_loader = DataLoader(test, batch_size=batch_size, shuffle=False, drop_last=True)
+#test_loader_one = DataLoader(test, batch_size=1, shuffle=False, drop_last=True)
