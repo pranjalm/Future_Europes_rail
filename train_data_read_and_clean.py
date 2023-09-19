@@ -21,7 +21,7 @@ station_cleaned_sorted = [ 'Oslo S', 'Lillestrøm', 'Gardermoen', 'Hamar', 'Brum
 # Creating the dictionary for station numbers between Oslo to Trondhiem Line
 station_dict = {station_cleaned_sorted[i]: i for i in range(len(station_cleaned_sorted))}
 # Reading the arrival and departure data acquired from BaneNOR 
-# The csv file can be downloaded from https://drive.google.com/file/d/1djfTDfKL2mqW9PT7suLRAbo7xf1v4vSq/view?usp=sharing
+# The csv file can be downloaded from https://drive.google.com/file/d/1K6l8eW0f5VK1Zi-ByEpLnwJMa9pOHbVG/view?usp=sharing
 df = pl.read_csv('trains.csv', separator ='\t')
 # remove all rows where the stations are not in the scope of list "station_cleaned_sorted"
 df = df.filter(pl.col("Station").is_in(station_cleaned_sorted))
